@@ -1,3 +1,7 @@
+import { createWalletClient, http } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts';
+import { sepolia } from 'viem/chains';
+
 const port = process.env.PORT || 8080;
 
 const corsHeaders = {
@@ -6,11 +10,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-function generateRandomAddress(): string {
-  const hexChars = Array.from({ length: 40 }, () => 
-    Math.floor(Math.random() * 16).toString(16)
-  ).join('');
-  return `0x${hexChars}`;
+async function generateRandomAddress(): Promise<string> {
+  const walletClient = createWalletClient({
+    account: privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`),
+    chain: sepolia,
+    transport: http(),
+  });
+
+  const addresses = await walletClient.getAddresses();
+  return addresses[0] as `0x${string}`;
 }
 
 function encodeAddress(address: string): string {
@@ -32,7 +40,7 @@ Bun.serve({
       const body = await req.json();
       console.log({ req: body });
 
-      const randomAddress = generateRandomAddress();
+      const randomAddress = await generateRandomAddress();
       const encodedAddress = encodeAddress(randomAddress);
       
       return new Response(JSON.stringify({ data: encodedAddress }), {
