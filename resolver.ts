@@ -1,4 +1,4 @@
-import { createWalletClient, http } from 'viem'
+import { createPublicClient, createWalletClient, http, type PublicClient } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { sepolia } from 'viem/chains'
 import { 
@@ -8,6 +8,8 @@ import {
   generateKeysFromSignature, 
   generateStealthAddresses 
 } from "@fluidkey/stealth-account-kit"
+import { getKernelAddressFromECDSA } from '@zerodev/ecdsa-validator'
+import { getEntryPoint, KERNEL_V3_1 } from '@zerodev/sdk/constants'
 
 const PORT = process.env.PORT || 8080
 const SEPOLIA_CHAIN_ID = 11155111
@@ -69,10 +71,29 @@ async function generateRandomStealthAddresses(): Promise<string[]> {
       ephemeralPrivateKey,
     })
 
-    stealthAddresses.push(newAddresses[0] as `0x${string}`)
+    const kernelAddress = await getKernelAddress(newAddresses[0] as `0x${string}`)
+    stealthAddresses.push(kernelAddress)
   }
 
   return stealthAddresses
+}
+
+// Get the kernel address for a stealth address
+async function getKernelAddress(stealthAddress: `0x${string}`) {
+  console.log("stealthAddress", stealthAddress)
+  const publicClient = createPublicClient({
+    chain: sepolia,
+    transport: http(),
+  })
+
+  const smartAccountAddress = await getKernelAddressFromECDSA({
+      publicClient,
+      eoaAddress: stealthAddress as `0x${string}`,
+      index: BigInt(0), 
+      entryPoint: getEntryPoint("0.7"), 
+      kernelVersion: KERNEL_V3_1,
+    });
+    return smartAccountAddress
 }
 
 // Main request handler for the ENS resolver
@@ -90,8 +111,7 @@ async function handleRequest(req: Request): Promise<Response> {
     // Generate stealth addresses, pick random one, and encode for response
     const stealthAddresses = await generateRandomStealthAddresses()
     const randomAddress = getRandomAddress(stealthAddresses)
-    const encodedAddress = encodeAddress(randomAddress)
-    
+    const encodedAddress = encodeAddress(randomAddress)    
     return new Response(JSON.stringify({ data: encodedAddress }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

@@ -16,7 +16,9 @@
   "dependencies": {
     "@ensdomains/ccip-read-router": "^0.0.6",
     "@fluidkey/stealth-account-kit": "^1.1.0",
+    "@zerodev/ecdsa-validator": "^5.4.9",
     "express": "^5.1.0",
+    "tslib": "^2.8.1",
     "viem": "^2.31.2"
   }
 }
