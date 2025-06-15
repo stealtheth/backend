@@ -10,7 +10,7 @@ bun install
 To run:
 
 ```bash
-bun run index.ts
+bun run start
 ```
 
-This project was created using `bun init` in bun v1.2.15. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+this will start an off-chain resolver gateway that will be used by clients (e.g MetaMask) for off chian resolution of the ens name.
