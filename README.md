@@ -7,6 +7,14 @@ To install dependencies:
 bun install
 ```
 
+```bash
+cp .env.example .env
+```
+
+and set the private key of the owner of the ENS name that the this off-chain resolver is being configured for.
+
+Note, the private key is not strictly required since the back-end only needs the master viewing key to support its operations.
+
 To run:
 
 ```bash
