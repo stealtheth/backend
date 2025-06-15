@@ -21,6 +21,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type',
 }
 
+// Create viem clients
+const walletClient = createWalletClient({
+  account: privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`),
+  chain: sepolia,
+  transport: http(),
+})
+
+const publicClient = createPublicClient({
+  chain: sepolia,
+  transport: http(),
+})
+
 // Helper function to get a random address from an array
 function getRandomAddress(addresses: string[]): `0x${string}` {
   const randomIndex = Math.floor(Math.random() * addresses.length)
@@ -32,34 +44,37 @@ function encodeAddress(address: string): string {
   return `0x${'0'.repeat(24)}${address.substring(2)}`
 }
 
+// Get the kernel address for a stealth address
+async function getKernelAddress(stealthAddress: `0x${string}`) {
+  const smartAccountAddress = await getKernelAddressFromECDSA({
+    publicClient,
+    eoaAddress: stealthAddress,
+    index: BigInt(0),
+    entryPoint: getEntryPoint('0.7'),
+    kernelVersion: KERNEL_V3_1,
+  })
+  return smartAccountAddress
+}
+
 // Main function to generate stealth addresses using Fluidkey protocol
 async function generateRandomStealthAddresses(): Promise<string[]> {
   // Create wallet client for signing operations
-  const walletClient = createWalletClient({
-    account: privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`),
-    chain: sepolia,
-    transport: http(),
-  })
-  
-  // Generate message for Fluidkey signature
-  const { message } = generateFluidkeyMessage({ 
-    pin: "0000", 
-    address: walletClient.account.address 
+  const { message } = generateFluidkeyMessage({
+    pin: '0000',
+    address: walletClient.account.address,
   })
 
   // Sign message and derive stealth keys
   const signature = await walletClient.signMessage({ message })
   const { spendingPrivateKey, viewingPrivateKey } = generateKeysFromSignature(signature)
-  
+
   // Extract BIP32 node and create spending account
   const derivedBIP32Node = extractViewingPrivateKeyNode(viewingPrivateKey, 0)
   const spendingAccount = privateKeyToAccount(spendingPrivateKey)
   const spendingPublicKey = spendingAccount.publicKey
 
-  const stealthAddresses: string[] = []
-
-  // Generate multiple stealth addresses using different nonces
-  for (let nonce = 0; nonce < STEALTH_ADDRESS_COUNT; nonce++) {
+  // Generate multiple stealth addresses in parallel using different nonces
+  const addressPromises = Array.from({ length: STEALTH_ADDRESS_COUNT }, (_, nonce) => {
     const { ephemeralPrivateKey } = generateEphemeralPrivateKey({
       viewingPrivateKeyNode: derivedBIP32Node,
       nonce: BigInt(nonce),
@@ -71,29 +86,10 @@ async function generateRandomStealthAddresses(): Promise<string[]> {
       ephemeralPrivateKey,
     })
 
-    const kernelAddress = await getKernelAddress(newAddresses[0] as `0x${string}`)
-    stealthAddresses.push(kernelAddress)
-  }
-
-  return stealthAddresses
-}
-
-// Get the kernel address for a stealth address
-async function getKernelAddress(stealthAddress: `0x${string}`) {
-  console.log("stealthAddress", stealthAddress)
-  const publicClient = createPublicClient({
-    chain: sepolia,
-    transport: http(),
+    return getKernelAddress(newAddresses[0] as `0x${string}`)
   })
 
-  const smartAccountAddress = await getKernelAddressFromECDSA({
-      publicClient,
-      eoaAddress: stealthAddress as `0x${string}`,
-      index: BigInt(0), 
-      entryPoint: getEntryPoint("0.7"), 
-      kernelVersion: KERNEL_V3_1,
-    });
-    return smartAccountAddress
+  return Promise.all(addressPromises)
 }
 
 // Main request handler for the ENS resolver
