@@ -1,6 +1,8 @@
 import { createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
+import { extractViewingPrivateKeyNode, generateEphemeralPrivateKey, generateFluidkeyMessage, generateKeysFromSignature, generateStealthAddresses, generateStealthPrivateKey } from "@fluidkey/stealth-account-kit"
+
 
 const port = process.env.PORT || 8080;
 
@@ -16,9 +18,50 @@ async function generateRandomAddress(): Promise<string> {
     chain: sepolia,
     transport: http(),
   });
+  
+  const { message } = await generateFluidkeyMessage({ pin: "0000", address: walletClient.account.address })
 
-  const addresses = await walletClient.getAddresses();
-  return addresses[0] as `0x${string}`;
+    const signature = await walletClient.signMessage({ message })
+
+    console.log("signature", signature)
+
+    const { spendingPrivateKey, viewingPrivateKey } = generateKeysFromSignature(signature)
+
+    const derivedBIP32Node = extractViewingPrivateKeyNode(
+      viewingPrivateKey,
+      0
+    );
+
+    const spendingAccount = privateKeyToAccount(
+      spendingPrivateKey
+    );
+    const spendingPublicKey = spendingAccount.publicKey;
+
+
+    const startNonce = 0;
+    const endNonce = 10;
+
+    const _stealthAddresses: string[] = [];
+
+    for (let i = startNonce; i < endNonce; i++) {
+      const { ephemeralPrivateKey } = generateEphemeralPrivateKey({
+        viewingPrivateKeyNode: derivedBIP32Node,
+        nonce: BigInt(i),
+        chainId: 11155111, // sepolia
+      });
+
+      const { stealthAddresses } = generateStealthAddresses({
+        spendingPublicKeys: [spendingPublicKey],
+        ephemeralPrivateKey: ephemeralPrivateKey,
+      });
+
+      _stealthAddresses.push(stealthAddresses[0] as `0x${string}`);
+    }
+
+    // Return a random address from the generated addresses
+    const randomIndex = Math.floor(Math.random() * _stealthAddresses.length);
+    return _stealthAddresses[randomIndex] as `0x${string}`;
+
 }
 
 function encodeAddress(address: string): string {
