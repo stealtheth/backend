@@ -1,4 +1,5 @@
-# backend
+# Personal ENS Off-Chain Resolver
+*Note the assumption here is that the owner of the ENS is running this back-end. However the back-end will no longer be required if ENS and Wallet clients like MetaMask support [EIP-5564](https://eips.ethereum.org/EIPS/eip-5564).*
 
 To install dependencies:
 
